@@ -1,1 +1,1 @@
-web: gunicorn srv.api:app
+web: gunicorn srv.app:app
