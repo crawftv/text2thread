@@ -1,0 +1,1 @@
+web: gunicorn srv.api:app
