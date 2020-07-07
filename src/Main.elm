@@ -35,7 +35,7 @@ type Msg
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { text = Loading }
-    , RemoteData.Http.getWithConfig RemoteData.Http.defaultConfig "http://localhost:5000/api" HandleResponse textDecoder
+    , RemoteData.Http.getWithConfig RemoteData.Http.defaultConfig "/api" HandleResponse textDecoder
     )
 
 
