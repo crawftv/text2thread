@@ -1,18 +1,20 @@
-port module Main exposing (main)
+module Main exposing (main)
 
 import Browser
-import Element
+import Element exposing (alignLeft, paddingEach)
 import Element.Border as Border
 import Element.Input as Input
 import Element.Region as Region
 import Html
-import Json.Decode as Decode exposing (Decoder, string, int, list)
+import Http
+import Json.Decode as Decode exposing (Decoder, int, list, string)
 import Json.Decode.Pipeline as Pipeline exposing (required)
+import RemoteData exposing (RemoteData(..), WebData)
+import RemoteData.Http
 
 
-type Model
-    = Loading
-    | TextLoaded Text
+type alias Model =
+    { text : WebData Text }
 
 
 type alias Text =
@@ -20,71 +22,121 @@ type alias Text =
 
 
 type alias Paragraph =
-    { pre_cleaned_words : List String
-    , tags : List String
-    , depth : Int
+    { depth : Int
+    , pre_cleaned_words : String
     }
 
 
 type Msg
-    = RecieveText String
+    = HandleResponse (WebData Text)
+    | GotJson
 
 
---encodeForm : Form -> Encode.Value
---encodeForm form =
---    Encode.object
---        [ ( "storyText", Encode.string form.storyText )
---        , ( "author", Encode.string form.author )
---        , ( "title", Encode.string form.title )
---        , ( "subtitle", Encode.string form.subtitle )
---        , ( "url", Encode.string form.url )
---        ]
-
-
-init : () -> ( Model, Cmd msg )
-init flags =
-    ( Loading
-    , Cmd.none
+init : () -> ( Model, Cmd Msg )
+init _ =
+    ( { text = Loading }
+    , RemoteData.Http.getWithConfig RemoteData.Http.defaultConfig "http://localhost:5000/api" HandleResponse textDecoder
     )
 
-port messageReceiver : (Decode.Value-> msg) -> Sub msg
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.none
+
 
 textDecoder : Decoder Text
 textDecoder =
     Decode.succeed Text
-        |> required (list paragraphDecoder)
+        |> required "data" (list paragraphDecoder)
+
+
 paragraphDecoder : Decoder Paragraph
 paragraphDecoder =
     Decode.succeed Paragraph
-        |> required "pre_cleaned_words" (list string)
         |> required "depth" int
-        |> required "tags" (list string)
+        |> required "pre_cleaned_words" string
+
+
+decodeError : Http.Error -> Browser.Document Msg
+decodeError error =
+    case error of
+        Http.BadUrl string ->
+            { title = "Bad Url"
+            , body = [ Element.layout [] (Element.text ("Error: " ++ string)) ]
+            }
+
+        Http.Timeout ->
+            { title = "Timeout"
+            , body = [ Element.layout [] (Element.text "timeout") ]
+            }
+
+        Http.NetworkError ->
+            { title = "Network Error"
+            , body = [ Element.layout [] (Element.text "network error") ]
+            }
+
+        Http.BadStatus int ->
+            { title = "Bad Status"
+            , body = [ Element.layout [] (Element.text ("Error: " ++ String.fromInt int)) ]
+            }
+
+        Http.BadBody string ->
+            { title = "Bad Body"
+            , body = [ Element.layout [] (Element.text ("Error: " ++ string)) ]
+            }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        RecieveText text->
-            ( TextLoaded (Text text)
-            , Cmd.none
-            )
+        GotJson ->
+            ( model, Cmd.none )
 
+        HandleResponse data ->
+            ( { model | text = data }, Cmd.none )
 
-subscriptions : Model -> Sub Msg
-subscriptions _ =
-    messageReceiver (textDecoder >> RecieveText)
 
 view : Model -> Browser.Document Msg
 view model =
-    case model of
-        TextLoaded text->
+    case model.text of
+        Failure error ->
+            decodeError error
+
+        Loading ->
+            { title = "Loading"
+            , body = [ Element.layout [] (Element.text "Loading") ]
+            }
+
+        Success data ->
             { title = "Home"
-            , body = [ Element.layout [] (viewText model) ]
+            , body = [ Element.layout [] (viewText data) ]
+            }
+
+        NotAsked ->
+            { title = "Not Asked"
+            , body = [ Element.layout [] (Element.text "Not Asked") ]
             }
 
 
+viewText : Text -> Element.Element Msg
+viewText text =
+    Element.textColumn [ Region.mainContent ] (List.map viewParagraph text.text)
 
-viewText model= Element.el [Region.mainContent] (Element.text (Debug.toString model) )
+
+edges =
+    { top = 8
+    , right = 0
+    , bottom = 8
+    , left = 4
+    }
+
+
+viewParagraph : Paragraph -> Element.Element Msg
+viewParagraph paragraph =
+    Element.row [ paddingEach { edges | left = 4 + paragraph.depth } ]
+        [ Element.el [ Element.width (Element.px (paragraph.depth*100)) ] (Element.text "")
+        , Element.paragraph [] [ Element.text paragraph.pre_cleaned_words ]
+        ]
 
 
 main =

@@ -1,28 +1,18 @@
-<!DOCTYPE HTML>
 <html>
 
 <head>
-  <meta charset="UTF-8">
-  <title>Elm + Websockets</title>
-  <script type="text/javascript" src="elm.js"></script>
+	<meta charset="UTF-8">
+	<title>Main</title>
+	<script src="static/elm.js"></script>
 </head>
 
 <body>
 	<div id="myapp"></div>
+	<script>
+		var app = Elm.Main.init({
+			node: document.getElementById('myapp')
+		});
+	</script>
 </body>
-{% block javscript %}
-<script type="text/javascript">
 
-// Start the Elm application.
-var app = Elm.Main.init({
-	node: document.getElementById('myapp')
-});
-
-// When a message comes into our WebSocket, we pass the message along
-// to the `messageReceiver` port.
-  app.ports.messageReceiver.send({{text | tojson}})
-  console.log(text)
-
-</script>
-{% endblock %}
 </html>
